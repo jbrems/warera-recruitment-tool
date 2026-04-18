@@ -1,13 +1,15 @@
-import { fetchAllUsers, clearCache } from '@/lib/warera-api'
+import { fetchAllUsers, clearCache, getLastUpdateDate, setLastUpdateDate } from '@/lib/warera-api'
 
 export async function GET(request) {
   try {
     console.log('[API Route] GET /api/users')
     const users = await fetchAllUsers()
-    console.log(`[API Route] Returning ${users.length} users to client`)
+    const lastUpdateDate = getLastUpdateDate()
+    console.log(`[API Route] Returning ${users.length} users, last updated at ${lastUpdateDate ? new Date(lastUpdateDate).toISOString() : 'never'}`)
     return Response.json({
       success: true,
-      data: users
+      data: users,
+      lastUpdateDate: lastUpdateDate
     })
   } catch (error) {
     console.error('[API Route] Error:', error.message)
@@ -21,12 +23,31 @@ export async function GET(request) {
   }
 }
 
-// POST endpoint to manually clear cache
+// POST endpoint to manually update or clear cache
 export async function POST(request) {
   try {
     const body = await request.json()
 
-    if (body.action === 'clearCache') {
+    if (body.action === 'update') {
+      console.log('[API Route] Updating user data...')
+      const lastUpdateDate = getLastUpdateDate()
+
+      // Fetch new users since last update
+      let lastUpdateTime = lastUpdateDate ? new Date(lastUpdateDate).getTime() : 0
+      // Start from 1 second before last update to catch any edge cases
+      lastUpdateTime = Math.max(0, lastUpdateTime - 1000)
+
+      const users = await fetchAllUsers(new Date(lastUpdateTime))
+      setLastUpdateDate(Date.now())
+
+      return Response.json({
+        success: true,
+        message: 'User data updated',
+        data: users,
+        lastUpdateDate: getLastUpdateDate()
+      })
+    } else if (body.action === 'clearCache') {
+      console.log('[API Route] Clearing cache...')
       clearCache()
       return Response.json({
         success: true,

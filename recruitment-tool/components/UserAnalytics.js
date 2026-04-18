@@ -30,23 +30,47 @@ export default function UserAnalytics() {
   const [viewMode, setViewMode] = useState('daily')
   const [dateRange, setDateRange] = useState(getCurrentMonth())
   const [totalNewUsers, setTotalNewUsers] = useState(0)
+  const [lastUpdateDate, setLastUpdateDate] = useState(null)
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const handleClearCache = async () => {
+  const handleUpdate = async () => {
     try {
-      console.log('[Client] Clearing cache...')
+      setIsUpdating(true)
+      console.log('[Client] Updating user data...')
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clearCache' })
+        body: JSON.stringify({ action: 'update' })
       })
       const data = await response.json()
       if (data.success) {
-        console.log('[Client] Cache cleared, reloading...')
-        window.location.reload()
+        console.log('[Client] Data updated, reloading...')
+        setAllUsers(data.data)
+        setLastUpdateDate(data.lastUpdateDate)
       }
     } catch (err) {
-      console.error('[Client] Error clearing cache:', err)
+      console.error('[Client] Error updating data:', err)
+    } finally {
+      setIsUpdating(false)
     }
+  }
+
+  const getFormattedUpdateDate = () => {
+    if (!lastUpdateDate) return 'Never'
+    const date = new Date(lastUpdateDate)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins === 1) return '1 min ago'
+    if (diffMins < 60) return `${diffMins} mins ago`
+
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours === 1) return '1 hour ago'
+    if (diffHours < 24) return `${diffHours} hours ago`
+
+    return format(date, 'MMM dd, HH:mm')
   }
 
   // Get the oldest user date to determine boundaries
@@ -78,6 +102,7 @@ export default function UserAnalytics() {
 
         console.log(`[Client] Successfully fetched ${data.data.length} users`)
         setAllUsers(data.data)
+        setLastUpdateDate(data.lastUpdateDate)
         setError(null)
       } catch (err) {
         setError(err)
@@ -89,6 +114,29 @@ export default function UserAnalytics() {
 
     loadUsers()
   }, [])
+
+  // Background update check - update if last update was > 15 minutes ago
+  useEffect(() => {
+    if (lastUpdateDate === null) return
+
+    const checkAndUpdate = () => {
+      const now = Date.now()
+      const timeSinceUpdate = now - new Date(lastUpdateDate).getTime()
+      const fifteenMinutes = 15 * 60 * 1000
+
+      if (timeSinceUpdate > fifteenMinutes) {
+        console.log('[Client] Last update was more than 15 minutes ago. Updating in background...')
+        handleUpdate()
+      }
+    }
+
+    // Check immediately
+    checkAndUpdate()
+
+    // Check every minute
+    const interval = setInterval(checkAndUpdate, 60000)
+    return () => clearInterval(interval)
+  }, [lastUpdateDate])
 
   // Update chart data when date range or view mode changes
   useEffect(() => {
@@ -237,17 +285,6 @@ export default function UserAnalytics() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-slate-300 text-lg font-medium">Loading user data...</p>
-        </div>
-      </div>
-    )
-  }
-
   if (error) {
     return <ErrorFallback error={error} />
   }
@@ -346,20 +383,34 @@ export default function UserAnalytics() {
           </button>
         </div>
 
-        {/* Cache Management */}
-        <div>
+        {/* Data Update Management */}
+        <div className="flex gap-3 items-center justify-end">
+          <p className="text-xs text-slate-400">
+            Last updated: {getFormattedUpdateDate()}
+          </p>
           <button
-            onClick={handleClearCache}
-            className="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-slate-900 rounded-lg font-medium transition-colors text-sm"
+            onClick={handleUpdate}
+            disabled={isUpdating}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm whitespace-nowrap ${isUpdating
+              ? 'bg-yellow-600 text-slate-900 cursor-wait opacity-75'
+              : 'bg-yellow-600 hover:bg-yellow-500 text-slate-900'
+              }`}
           >
-            🔄 Clear Cache & Reload
+            {isUpdating ? '⟳ Updating...' : '⟳ Update Data'}
           </button>
         </div>
       </div>
 
       {/* Chart */}
       <div className="bg-slate-800 rounded-lg shadow-md p-4 flex-1 min-h-0 border border-slate-700">
-        {chartData.length > 0 ? (
+        {loading ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+              <p className="text-slate-300 text-lg font-medium">Loading graph...</p>
+            </div>
+          </div>
+        ) : chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#64748b" />
