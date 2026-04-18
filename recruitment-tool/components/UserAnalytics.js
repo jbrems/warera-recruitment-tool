@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Label } from 'recharts'
 import { format } from 'date-fns'
+import { fetchCountries } from '@/lib/warera-api'
 import { groupUsersByDay, groupUsersByHour, groupUsersByMonth, getCurrentMonth, getPreviousMonth, getNextMonth, getCurrentDay, getPreviousDay, getNextDay, getCurrentYear, getPreviousYear, getNextYear } from '@/lib/data-processing'
 
 function ErrorFallback({ error }) {
@@ -32,6 +33,10 @@ export default function UserAnalytics() {
   const [totalNewUsers, setTotalNewUsers] = useState(0)
   const [lastUpdateDate, setLastUpdateDate] = useState(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [countries, setCountries] = useState([])
+  const [selectedCountry, setSelectedCountry] = useState(null)
+  const [loadingCountries, setLoadingCountries] = useState(true)
+  const [countryFilter, setCountryFilter] = useState('')
 
   const handleUpdate = async () => {
     try {
@@ -40,7 +45,7 @@ export default function UserAnalytics() {
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update' })
+        body: JSON.stringify({ action: 'update', countryId: selectedCountry?.id })
       })
       const data = await response.json()
       if (data.success) {
@@ -73,6 +78,77 @@ export default function UserAnalytics() {
     return format(date, 'MMM dd, HH:mm')
   }
 
+  // Fetch countries on mount and load selected country from localStorage
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        setLoadingCountries(true)
+        const countryList = await fetchCountries()
+        // Sort countries by name alphabetically
+        const sortedCountries = [...countryList].sort((a, b) => a.name.localeCompare(b.name))
+        setCountries(sortedCountries)
+
+        // Load selected country from localStorage or use auto-detection
+        const savedCountryId = localStorage.getItem('selectedCountryId')
+        let country = sortedCountries.find(c => c.id === savedCountryId)
+
+        if (!country) {
+          // Try to auto-detect country from IP if not saved
+          try {
+            console.log('[Client] Attempting to auto-detect country from IP...')
+            const detectResponse = await fetch('/api/detect-country')
+            if (detectResponse.ok) {
+              const detectData = await detectResponse.json()
+              if (detectData.success && detectData.countryCode) {
+                console.log('[Client] Detected country code:', detectData.countryCode)
+                // Try to find country by code (assuming country names or codes match)
+                country = sortedCountries.find(c =>
+                  c.name.toUpperCase().includes(detectData.countryCode) ||
+                  c.id.includes(detectData.countryCode)
+                )
+              }
+            }
+          } catch (err) {
+            console.error('[Client] Auto-detection failed:', err)
+          }
+        }
+
+        // Fall back to Belgium if still no country found
+        if (!country) {
+          country = sortedCountries.find(c => c.id === '6813b6d446e731854c7ac7a4') // Belgium
+        }
+
+        // Fall back to first country if Belgium not found
+        if (!country && sortedCountries.length > 0) {
+          country = sortedCountries[0]
+        }
+
+        if (country) {
+          setSelectedCountry(country)
+          localStorage.setItem('selectedCountryId', country.id)
+        }
+      } catch (err) {
+        console.error('[Client] Error loading countries:', err)
+      } finally {
+        setLoadingCountries(false)
+      }
+    }
+    loadCountries()
+  }, [])
+
+  // Handle country change
+  const handleCountryChange = (e) => {
+    const countryId = e.target.value
+    const country = countries.find(c => c.id === countryId)
+    if (country) {
+      setSelectedCountry(country)
+      localStorage.setItem('selectedCountryId', country.id)
+      setAllUsers([])
+      setChartData([])
+      setLoading(true)
+    }
+  }
+
   // Get the oldest user date to determine boundaries
   const getOldestUserDate = () => {
     if (allUsers.length === 0) return null
@@ -82,13 +158,15 @@ export default function UserAnalytics() {
 
   const oldestUserDate = getOldestUserDate()
 
-  // Fetch all users on mount
+  // Fetch all users on mount or when country changes
   useEffect(() => {
+    if (!selectedCountry) return
+
     const loadUsers = async () => {
       try {
         setLoading(true)
-        console.log('[Client] Fetching users from API...')
-        const response = await fetch('/api/users')
+        console.log('[Client] Fetching users from API for country:', selectedCountry.name)
+        const response = await fetch(`/api/users?countryId=${selectedCountry.id}`)
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
@@ -113,7 +191,7 @@ export default function UserAnalytics() {
     }
 
     loadUsers()
-  }, [])
+  }, [selectedCountry])
 
   // Background update check - update if last update was > 15 minutes ago
   useEffect(() => {
@@ -296,7 +374,36 @@ export default function UserAnalytics() {
         <h1 className="text-2xl md:text-3xl font-bold text-yellow-400 mb-2">
           User Growth Analytics
         </h1>
-        <p className="text-slate-400">Belgium - New Users Per {viewMode === 'hourly' ? 'Hour' : viewMode === 'daily' ? 'Day' : 'Month'}</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-slate-400">
+            New Users Per {viewMode === 'hourly' ? 'Hour' : viewMode === 'daily' ? 'Day' : 'Month'}
+          </p>
+          {!loadingCountries && countries.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-slate-400 text-sm font-medium">Country:</label>
+              <input
+                type="text"
+                placeholder="Filter countries..."
+                value={countryFilter}
+                onChange={(e) => setCountryFilter(e.target.value)}
+                className="px-2 py-1 bg-slate-700 text-slate-200 rounded-lg text-sm border border-slate-600 placeholder-slate-500 focus:outline-none focus:border-yellow-400 transition-colors"
+              />
+              <select
+                value={selectedCountry?.id || ''}
+                onChange={handleCountryChange}
+                className="px-3 py-1 bg-slate-700 text-slate-200 rounded-lg text-sm border border-slate-600 hover:bg-slate-600 transition-colors cursor-pointer"
+              >
+                {countries
+                  .filter((country) => country.name.toLowerCase().includes(countryFilter.toLowerCase()))
+                  .map((country) => (
+                    <option key={country.id} value={country.id}>
+                      {country.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats Card */}
@@ -402,7 +509,7 @@ export default function UserAnalytics() {
       </div>
 
       {/* Chart */}
-      <div className="bg-slate-800 rounded-lg shadow-md p-4 flex-1 min-h-0 border border-slate-700">
+      <div className="bg-slate-800 rounded-lg shadow-md p-1 md:p-4 flex-1 min-h-0 border border-slate-700">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">

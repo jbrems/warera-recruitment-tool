@@ -2,9 +2,11 @@ import { fetchAllUsers, clearCache, getLastUpdateDate, setLastUpdateDate } from 
 
 export async function GET(request) {
   try {
-    console.log('[API Route] GET /api/users')
-    const users = await fetchAllUsers()
-    const lastUpdateDate = getLastUpdateDate()
+    const { searchParams } = new URL(request.url)
+    const countryId = searchParams.get('countryId') || '6813b6d446e731854c7ac7a4'
+    console.log('[API Route] GET /api/users, countryId:', countryId)
+    const users = await fetchAllUsers(null, countryId)
+    const lastUpdateDate = getLastUpdateDate(countryId)
     console.log(`[API Route] Returning ${users.length} users, last updated at ${lastUpdateDate ? new Date(lastUpdateDate).toISOString() : 'never'}`)
     return Response.json({
       success: true,
@@ -27,27 +29,29 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json()
+    const countryId = body.countryId || '6813b6d446e731854c7ac7a4'
 
     if (body.action === 'update') {
-      console.log('[API Route] Updating user data...')
-      const lastUpdateDate = getLastUpdateDate()
+      console.log('[API Route] Updating user data for countryId:', countryId)
+      const lastUpdateDate = getLastUpdateDate(countryId)
 
       // Fetch new users since last update
       let lastUpdateTime = lastUpdateDate ? new Date(lastUpdateDate).getTime() : 0
       // Start from 1 second before last update to catch any edge cases
       lastUpdateTime = Math.max(0, lastUpdateTime - 1000)
 
-      const users = await fetchAllUsers(new Date(lastUpdateTime))
-      setLastUpdateDate(Date.now())
+      const users = await fetchAllUsers(new Date(lastUpdateTime), countryId)
+      setLastUpdateDate(Date.now(), countryId)
 
       return Response.json({
         success: true,
         message: 'User data updated',
         data: users,
-        lastUpdateDate: getLastUpdateDate()
+        lastUpdateDate: getLastUpdateDate(countryId)
       })
     } else if (body.action === 'clearCache') {
-      console.log('[API Route] Clearing cache...')
+      console.log('[API Route] Clearing cache for countryId:', countryId)
+      clearCache(countryId)
       clearCache()
       return Response.json({
         success: true,
