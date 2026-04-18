@@ -402,7 +402,7 @@ export default function UserAnalytics() {
       </div>
 
       {/* Chart */}
-      <div className="bg-slate-800 rounded-lg shadow-md p-4 flex-1 min-h-0 border border-slate-700">
+      <div className="bg-slate-800 rounded-lg shadow-md px-1 py-4 md:px-4 flex-1 min-h-0 border border-slate-700">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">
