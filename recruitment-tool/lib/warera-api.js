@@ -1,29 +1,51 @@
 import axios from 'axios'
 
 const WARERA_API_URL = 'https://api2.warera.io/trpc/user.getUsersByCountry'
-const COUNTRY_ID = '6813b6d446e731854c7ac7a4' // Belgium
+const WARERA_COUNTRIES_URL = 'https://api2.warera.io/trpc/country.getAllCountries'
+const DEFAULT_COUNTRY_ID = '6813b6d446e731854c7ac7a4' // Belgium
 
-// Cache storage - lives indefinitely
-const cache = {
-  data: null,
-  lastUpdateDate: null
+// Cache storage - separate cache per country
+const caches = {}
+
+const getCache = (countryId) => {
+  if (!caches[countryId]) {
+    caches[countryId] = {
+      data: null,
+      lastUpdateDate: null
+    }
+  }
+  return caches[countryId]
 }
 
-export const getLastUpdateDate = () => {
-  return cache.lastUpdateDate
+export const getLastUpdateDate = (countryId = DEFAULT_COUNTRY_ID) => {
+  return getCache(countryId).lastUpdateDate
 }
 
-export const setLastUpdateDate = (date) => {
-  cache.lastUpdateDate = date
+export const setLastUpdateDate = (date, countryId = DEFAULT_COUNTRY_ID) => {
+  getCache(countryId).lastUpdateDate = date
   console.log('[API] Last update date set to:', new Date(date).toISOString())
 }
 
-// Fetch single page of users from Warera API
-export const fetchUsersPage = async (limit = 100, cursor = '') => {
+// Fetch countries from Warera API
+export const fetchCountries = async () => {
   try {
-    console.log(`[API] Fetching users - limit: ${limit}, cursor: ${cursor || 'none'}`)
+    console.log('[API] Fetching countries...')
+    const response = await axios.post(WARERA_COUNTRIES_URL, {})
+    const countries = response.data.result.data || []
+    console.log(`[API] Successfully fetched ${countries.length} countries`)
+    return countries
+  } catch (error) {
+    console.error('[API] Failed to fetch countries:', error.message)
+    throw error
+  }
+}
+
+// Fetch single page of users from Warera API
+export const fetchUsersPage = async (countryId = DEFAULT_COUNTRY_ID, limit = 100, cursor = '') => {
+  try {
+    console.log(`[API] Fetching users - countryId: ${countryId}, limit: ${limit}, cursor: ${cursor || 'none'}`)
     const response = await axios.post(WARERA_API_URL, {
-      countryId: COUNTRY_ID,
+      countryId,
       limit,
       cursor
     })
@@ -44,14 +66,16 @@ export const fetchUsersPage = async (limit = 100, cursor = '') => {
 }
 
 // Fetch all users with pagination, optionally stopping at a cutoff date
-export const fetchAllUsers = async (cutoffDate = null) => {
+export const fetchAllUsers = async (cutoffDate = null, countryId = DEFAULT_COUNTRY_ID) => {
+  console.log('[API] fetchAllUsers called with countryId:', countryId, 'cutoffDate:', cutoffDate ? new Date(cutoffDate).toISOString() : 'none')
+  const cache = getCache(countryId)
   // Return cached data if it exists and no cutoff date is specified
   if (cache.data !== null && cutoffDate === null) {
-    console.log('[API] Returning cached data with', cache.data.length, 'users')
+    console.log('[API] Returning cached data with', cache.data.length, 'users for countryId:', countryId)
     return cache.data
   }
 
-  console.log('[API] Fetching user data...')
+  console.log('[API] Fetching fresh user data for countryId:', countryId)
   let allUsers = []
   let cursor = ''
   let hasMore = true
@@ -61,7 +85,7 @@ export const fetchAllUsers = async (cutoffDate = null) => {
     try {
       pageCount++
       console.log(`[API] Fetching page ${pageCount}... (currentCursor: "${cursor}")`)
-      const result = await fetchUsersPage(100, cursor)
+      const result = await fetchUsersPage(countryId, 100, cursor)
 
       console.log(`[API] Page ${pageCount} got ${result.items.length} items`)
       console.log(`[API] Accumulated so far: ${allUsers.length} users`)
@@ -124,8 +148,9 @@ export const fetchAllUsers = async (cutoffDate = null) => {
   return allUsers
 }
 
-export const clearCache = () => {
-  console.log('[API] Cache cleared manually')
+export const clearCache = (countryId = DEFAULT_COUNTRY_ID) => {
+  console.log('[API] Cache cleared manually for country:', countryId)
+  const cache = getCache(countryId)
   cache.data = null
   cache.lastUpdateDate = null
 }
