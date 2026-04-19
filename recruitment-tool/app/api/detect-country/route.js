@@ -1,6 +1,16 @@
 export async function GET(request) {
   try {
-    // Try to get country from Cloudflare header (CF-IPCountry)
+    // Vercel provides x-vercel-ip-country header
+    const vercelCountry = request.headers.get('x-vercel-ip-country')
+    if (vercelCountry && vercelCountry !== 'XX') {
+      console.log('[API Route] Detected country from x-vercel-ip-country:', vercelCountry)
+      return Response.json({
+        success: true,
+        countryCode: vercelCountry
+      })
+    }
+
+    // Try to get from Cloudflare header (CF-IPCountry) as fallback
     const cfCountry = request.headers.get('cf-ipcountry')
     if (cfCountry && cfCountry !== 'XX') {
       console.log('[API Route] Detected country from CF-IPCountry:', cfCountry)

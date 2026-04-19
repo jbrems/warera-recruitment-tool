@@ -67,14 +67,15 @@ export const fetchUsersPage = async (countryId = DEFAULT_COUNTRY_ID, limit = 100
 
 // Fetch all users with pagination, optionally stopping at a cutoff date
 export const fetchAllUsers = async (cutoffDate = null, countryId = DEFAULT_COUNTRY_ID) => {
+  console.log('[API] fetchAllUsers called with countryId:', countryId, 'cutoffDate:', cutoffDate ? new Date(cutoffDate).toISOString() : 'none')
   const cache = getCache(countryId)
   // Return cached data if it exists and no cutoff date is specified
   if (cache.data !== null && cutoffDate === null) {
-    console.log('[API] Returning cached data with', cache.data.length, 'users')
+    console.log('[API] Returning cached data with', cache.data.length, 'users for countryId:', countryId)
     return cache.data
   }
 
-  console.log('[API] Fetching user data...')
+  console.log('[API] Fetching fresh user data for countryId:', countryId)
   let allUsers = []
   let cursor = ''
   let hasMore = true

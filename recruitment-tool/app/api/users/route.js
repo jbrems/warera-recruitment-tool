@@ -3,11 +3,13 @@ import { fetchAllUsers, clearCache, getLastUpdateDate, setLastUpdateDate } from 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const countryId = searchParams.get('countryId') || '6813b6d446e731854c7ac7a4'
-    console.log('[API Route] GET /api/users, countryId:', countryId)
+    const countryIdParam = searchParams.get('countryId')
+    const countryId = (countryIdParam && countryIdParam !== 'undefined') ? countryIdParam : '6813b6d446e731854c7ac7a4'
+    console.log('[API Route GET] Received countryId param:', countryIdParam, 'using countryId:', countryId)
+    console.log('[API Route GET] searchParams:', [...searchParams.entries()])
     const users = await fetchAllUsers(null, countryId)
     const lastUpdateDate = getLastUpdateDate(countryId)
-    console.log(`[API Route] Returning ${users.length} users, last updated at ${lastUpdateDate ? new Date(lastUpdateDate).toISOString() : 'never'}`)
+    console.log(`[API Route GET] Returning ${users.length} users for countryId: ${countryId}, last updated at ${lastUpdateDate ? new Date(lastUpdateDate).toISOString() : 'never'}`)
     return Response.json({
       success: true,
       data: users,
