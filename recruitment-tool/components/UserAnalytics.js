@@ -13,8 +13,6 @@ function CustomTooltip({ active, payload, redditPosts, viewMode }) {
 
   const dateKey = payload[0].payload.date
   const userCount = payload.find(p => p.name === 'New Users')?.value || 0
-  // Look for the Reddit line by its dataKey rather than name, since the name changes with country
-  const redditUpvotes = payload.find(p => p.dataKey === 'redditViews')?.value || 0
 
   // Filter posts for this date/period
   let postsForDate = redditPosts.filter(post => {
@@ -22,21 +20,24 @@ function CustomTooltip({ active, payload, redditPosts, viewMode }) {
     return postDate === dateKey
   })
 
-  // Sort by upvotes descending
+  // Sort by upvotes descending and get top 3
   postsForDate = postsForDate.sort((a, b) => b.views - a.views)
+  const totalUpvotes = postsForDate.reduce((sum, post) => sum + post.views, 0)
+  const totalPostCount = postsForDate.length
+  const topPosts = postsForDate.slice(0, 3)
 
   return (
     <div className="bg-slate-800 border-2 border-yellow-400 rounded-lg p-3 shadow-lg max-w-md">
       <p className="text-yellow-400 font-semibold mb-2">{dateKey}</p>
       <p className="text-slate-200 text-sm mb-2">New Users: <span className="text-yellow-400 font-semibold">{userCount}</span></p>
       {redditPosts.length > 0 && (
-        <p className="text-slate-200 text-sm mb-3">Reddit Upvotes: <span className="text-purple-400 font-semibold">{redditUpvotes}</span></p>
+        <p className="text-slate-200 text-sm mb-3">Total Upvotes: <span className="text-purple-400 font-semibold">{totalUpvotes}</span></p>
       )}
       {postsForDate.length > 0 && (
         <div className="border-t border-slate-600 pt-2 mt-2">
-          <p className="text-slate-300 text-xs font-semibold mb-2">Posts ({postsForDate.length}):</p>
+          <p className="text-slate-300 text-xs font-semibold mb-2">Top posts (of {totalPostCount}):</p>
           <div className="space-y-2">
-            {postsForDate.map((post) => (
+            {topPosts.map((post) => (
               <div key={post.id} className="bg-slate-700 p-2 rounded text-xs">
                 <p className="text-slate-200 font-medium truncate max-w-[210px]">{post.title}</p>
                 <div className="flex justify-between items-center">
