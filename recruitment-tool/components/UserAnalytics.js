@@ -38,7 +38,7 @@ function CustomTooltip({ active, payload, redditPosts, viewMode }) {
           <p className="text-slate-300 text-xs font-semibold mb-2">Top posts (of {totalPostCount}):</p>
           <div className="space-y-2">
             {topPosts.map((post) => (
-              <div key={post.id} className="bg-slate-700 p-2 rounded text-xs">
+              <div key={post.id} className="bg-slate-700 p-2 rounded text-xs min-w-[250px]">
                 <p className="text-slate-200 font-medium truncate max-w-[210px]">{post.title}</p>
                 <div className="flex justify-between items-center">
                   <p className="text-slate-400 text-xs">by {post.author}</p>
