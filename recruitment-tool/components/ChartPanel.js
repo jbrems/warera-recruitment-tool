@@ -1,4 +1,4 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 export default function ChartPanel({ loading, chartData }) {
   if (loading) {
@@ -20,6 +20,9 @@ export default function ChartPanel({ loading, chartData }) {
     )
   }
 
+  // Check if we have Reddit data
+  const hasRedditData = chartData.some((item) => item.redditUpvotes !== undefined && item.redditUpvotes !== null && item.redditUpvotes > 0)
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={chartData} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
@@ -31,7 +34,10 @@ export default function ChartPanel({ loading, chartData }) {
           height={chartData.length > 15 ? 80 : 40}
           interval={Math.max(0, Math.floor(chartData.length / 7))}
         />
-        <YAxis tick={{ fontSize: 12, fill: '#cbd5e1' }} allowDecimals={false} />
+        <YAxis tick={{ fontSize: 12, fill: '#cbd5e1' }} allowDecimals={false} yAxisId="left" />
+        {hasRedditData && (
+          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#cbd5e1' }} allowDecimals={false} />
+        )}
         <Tooltip
           contentStyle={{
             backgroundColor: '#1e293b',
@@ -40,10 +46,17 @@ export default function ChartPanel({ loading, chartData }) {
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
           }}
           labelStyle={{ color: '#fbbf24' }}
-          formatter={(value) => [`${value} users`, 'New Users']}
+          formatter={(value, name) => {
+            if (name === 'redditViews') {
+              return [`${value} views`, 'Reddit Post Views']
+            }
+            return [`${value}`, name]
+          }}
           labelFormatter={(label) => `${label}`}
         />
+        {hasRedditData && <Legend />}
         <Line
+          yAxisId="left"
           type="monotone"
           dataKey="count"
           stroke="#fbbf24"
@@ -54,6 +67,19 @@ export default function ChartPanel({ loading, chartData }) {
           name="New Users"
           label={{ position: 'top', fill: '#fbbf24', fontSize: 12, offset: 10 }}
         />
+        {hasRedditData && (
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="redditViews"
+            stroke="#8b5cf6"
+            dot={{ fill: '#8b5cf6', r: 4 }}
+            activeDot={{ r: 6 }}
+            strokeWidth={2}
+            isAnimationActive={true}
+            name="Reddit Post Views"
+          />
+        )}
       </LineChart>
     </ResponsiveContainer>
   )
