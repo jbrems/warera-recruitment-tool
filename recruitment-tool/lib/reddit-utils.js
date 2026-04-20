@@ -1,41 +1,69 @@
 import { format, startOfDay, addDays, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 
 /**
- * Fetches posts from a Reddit subreddit via API endpoint (avoids CORS issues)
+ * Fetches posts from a Reddit subreddit directly from Reddit's API
  * @param {string} subreddit - The subreddit name (e.g., 'WareraBelgium')
  * @param {number} limit - Number of posts to fetch per request (default: 100, max: 100)
  * @returns {Promise<Array>} Array of posts with created date and upvotes
  */
 export async function fetchRedditPosts(subreddit = 'WareraBelgium', limit = 100) {
   try {
-    console.log(`[Client] Fetching Reddit posts from r/${subreddit} via API...`)
+    console.log(`[Client] Fetching Reddit posts from r/${subreddit}...`)
 
-    const response = await fetch(`/api/reddit-posts?subreddit=${encodeURIComponent(subreddit)}&limit=${limit}`)
+    const allPosts = []
+    let after = null
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`)
+    // Fetch posts in batches (up to 5 batches)
+    for (let i = 0; i < 5; i++) {
+      const url = new URL(`https://www.reddit.com/r/${subreddit}/new.json`)
+      url.searchParams.append('limit', limit.toString())
+      if (after) {
+        url.searchParams.append('after', after)
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'User-Agent': 'WarereaBelgium Analytics (warera-recruitment-tool, v1.0)'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Reddit API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (!data.data || !data.data.children) {
+        console.warn('[Client] No children in Reddit response')
+        break
+      }
+
+      const posts = data.data.children.map((post) => ({
+        id: post.data.id,
+        title: post.data.title,
+        author: post.data.author,
+        created: new Date(post.data.created_utc * 1000), // Convert Unix timestamp to Date
+        views: post.data.ups || 0,
+        comments: post.data.num_comments,
+        score: post.data.score,
+        url: `https://reddit.com${post.data.permalink}`
+      }))
+
+      allPosts.push(...posts)
+
+      // Check if we can fetch more
+      after = data.data.after
+      if (!after) {
+        console.log(`[Client] Fetched all ${allPosts.length} posts (no more data available)`)
+        break
+      }
+
+      // Small delay between requests to be respectful to Reddit
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
-    const data = await response.json()
-
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to fetch Reddit posts')
-    }
-
-    // Convert API response to our post format
-    const posts = data.data.map((post) => ({
-      id: post.id,
-      title: post.title,
-      author: post.author,
-      created: new Date(post.created_utc * 1000), // Convert Unix timestamp to Date
-      views: post.view_count || 0,
-      comments: post.num_comments,
-      score: post.score,
-      url: `https://reddit.com${post.permalink}`
-    }))
-
-    console.log(`[Client] Successfully fetched ${posts.length} posts from r/${subreddit}`)
-    return posts
+    console.log(`[Client] Successfully fetched ${allPosts.length} posts from r/${subreddit}`)
+    return allPosts
   } catch (error) {
     console.error('[Client] Error fetching Reddit posts:', error)
     throw error

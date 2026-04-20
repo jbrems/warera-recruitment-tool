@@ -4,7 +4,7 @@ export const metadata = {
   title: 'Warera User Growth Analytics',
   description: 'Mobile-first analytics dashboard visualizing user growth data',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.svg',
   },
 }
 

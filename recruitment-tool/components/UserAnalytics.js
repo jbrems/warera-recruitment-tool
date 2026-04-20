@@ -13,7 +13,8 @@ function CustomTooltip({ active, payload, redditPosts, viewMode }) {
 
   const dateKey = payload[0].payload.date
   const userCount = payload.find(p => p.name === 'New Users')?.value || 0
-  const redditUpvotes = payload.find(p => p.name === 'Reddit Upvotes')?.value || 0
+  // Look for the Reddit line by its dataKey rather than name, since the name changes with country
+  const redditUpvotes = payload.find(p => p.dataKey === 'redditViews')?.value || 0
 
   // Filter posts for this date/period
   let postsForDate = redditPosts.filter(post => {
