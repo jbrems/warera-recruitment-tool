@@ -1,10 +1,55 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Label } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Label, Legend } from 'recharts'
 import { format } from 'date-fns'
 import { fetchCountries } from '@/lib/warera-api'
 import { groupUsersByDay, groupUsersByHour, groupUsersByMonth, getCurrentMonth, getPreviousMonth, getNextMonth, getCurrentDay, getPreviousDay, getNextDay, getCurrentYear, getPreviousYear, getNextYear } from '@/lib/data-processing'
+import { fetchRedditPosts, groupRedditPostsByDay, groupRedditPostsByHour, groupRedditPostsByMonth } from '@/lib/reddit-utils'
+import { REDDIT_COMMUNITIES } from '@/lib/reddit-communities'
+
+function CustomTooltip({ active, payload, redditPosts, viewMode }) {
+  if (!active || !payload || payload.length === 0) return null
+
+  const dateKey = payload[0].payload.date
+  const userCount = payload.find(p => p.name === 'New Users')?.value || 0
+  const redditUpvotes = payload.find(p => p.name === 'Reddit Upvotes')?.value || 0
+
+  // Filter posts for this date/period
+  let postsForDate = redditPosts.filter(post => {
+    const postDate = format(post.created, viewMode === 'monthly' ? 'yyyy-MM' : viewMode === 'hourly' ? 'yyyy-MM-dd HH:00' : 'yyyy-MM-dd')
+    return postDate === dateKey
+  })
+
+  // Sort by upvotes descending
+  postsForDate = postsForDate.sort((a, b) => b.views - a.views)
+
+  return (
+    <div className="bg-slate-800 border-2 border-yellow-400 rounded-lg p-3 shadow-lg max-w-md">
+      <p className="text-yellow-400 font-semibold mb-2">{dateKey}</p>
+      <p className="text-slate-200 text-sm mb-2">New Users: <span className="text-yellow-400 font-semibold">{userCount}</span></p>
+      {redditPosts.length > 0 && (
+        <p className="text-slate-200 text-sm mb-3">Reddit Upvotes: <span className="text-purple-400 font-semibold">{redditUpvotes}</span></p>
+      )}
+      {postsForDate.length > 0 && (
+        <div className="border-t border-slate-600 pt-2 mt-2">
+          <p className="text-slate-300 text-xs font-semibold mb-2">Posts ({postsForDate.length}):</p>
+          <div className="space-y-2">
+            {postsForDate.map((post) => (
+              <div key={post.id} className="bg-slate-700 p-2 rounded text-xs">
+                <p className="text-slate-200 font-medium truncate max-w-[210px]">{post.title}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-slate-400 text-xs">by {post.author}</p>
+                  <p className="text-purple-400 font-semibold">↑ {post.views}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ErrorFallback({ error }) {
   return (
@@ -25,6 +70,7 @@ function ErrorFallback({ error }) {
 
 export default function UserAnalytics() {
   const [allUsers, setAllUsers] = useState([])
+  const [redditPosts, setRedditPosts] = useState([])
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -177,6 +223,34 @@ export default function UserAnalytics() {
     }
     loadCountries()
   }, [])
+
+  // Fetch Reddit posts when country changes (only if country has a Reddit community)
+  useEffect(() => {
+    if (!selectedCountry) {
+      setRedditPosts([])
+      return
+    }
+
+    const subreddit = REDDIT_COMMUNITIES[selectedCountry.name]
+    if (!subreddit) {
+      console.log(`[Client] No Reddit community configured for ${selectedCountry.name}`)
+      setRedditPosts([])
+      return
+    }
+
+    const loadRedditPosts = async () => {
+      try {
+        console.log(`[Client] Fetching Reddit posts from ${subreddit}...`)
+        const posts = await fetchRedditPosts(subreddit.replace('r/', ''), 100)
+        console.log(`[Client] Successfully loaded ${posts.length} Reddit posts from ${subreddit}`)
+        setRedditPosts(posts)
+      } catch (err) {
+        console.error(`[Client] Error fetching Reddit posts from ${subreddit}:`, err)
+        setRedditPosts([])
+      }
+    }
+    loadRedditPosts()
+  }, [selectedCountry])
 
   // Handle country selection from combobox
   const handleCountrySelect = (country) => {
@@ -343,16 +417,56 @@ export default function UserAnalytics() {
       data = groupUsersByMonth(allUsers, dateRange.startDate, dateRange.endDate)
     }
 
+    // Merge Reddit data if available
+    if (redditPosts.length > 0) {
+      console.log(`[Client] Merging ${redditPosts.length} Reddit posts into chart data...`)
+      let redditData
+      if (viewMode === 'daily') {
+        redditData = groupRedditPostsByDay(redditPosts, dateRange.startDate, dateRange.endDate)
+      } else if (viewMode === 'hourly') {
+        redditData = groupRedditPostsByHour(redditPosts, dateRange.startDate, dateRange.endDate)
+      } else if (viewMode === 'monthly') {
+        redditData = groupRedditPostsByMonth(redditPosts, dateRange.startDate, dateRange.endDate)
+      }
+
+      console.log(`[Client] Reddit data grouped into ${redditData.length} entries`)
+
+      // Merge Reddit data into user data by matching date strings
+      data = data.map((userEntry) => {
+        const redditEntry = redditData.find((r) => r.date === userEntry.date)
+        return {
+          ...userEntry,
+          redditViews: redditEntry ? redditEntry.totalViews : 0
+        }
+      })
+
+      // Log sample of merged data
+      console.log('[Client] Sample merged data:', data.slice(0, 3))
+    } else {
+      console.log('[Client] No Reddit posts to merge')
+    }
+
     // Remove trailing zeros (future dates with no users)
     const now = new Date()
-    while (data.length > 0 && data[data.length - 1].count === 0 && new Date(data[data.length - 1].date) > now) {
-      data.pop()
+    now.setHours(23, 59, 59, 999)
+
+    while (data.length > 0) {
+      const lastEntry = data[data.length - 1]
+      // Parse the date string (yyyy-MM-dd format)
+      const [year, month, day] = lastEntry.date.split('-').map(Number)
+      const entryDate = new Date(year, month - 1, day, 23, 59, 59)
+
+      if (lastEntry.count === 0 && entryDate > now) {
+        data.pop()
+      } else {
+        break
+      }
     }
 
     setChartData(data)
     const total = data.reduce((sum, item) => sum + item.count, 0)
     setTotalNewUsers(total)
-  }, [allUsers, viewMode, dateRange])
+  }, [allUsers, viewMode, dateRange, redditPosts])
 
   // Update date range when view mode changes
   useEffect(() => {
@@ -479,7 +593,7 @@ export default function UserAnalytics() {
   }
 
   return (
-    <div className="w-full h-full overflow-auto flex flex-col bg-slate-900 p-2 md:p-6">
+    <div className="w-full h-full overflow-auto flex flex-col bg-slate-900 px-1 py-2 md:p-6" style={{ scrollbarGutter: 'stable' }}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-yellow-400 mb-4">
@@ -698,7 +812,7 @@ export default function UserAnalytics() {
           </div>
         ) : chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 20, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#64748b" />
               <XAxis
                 dataKey="displayDate"
@@ -707,19 +821,16 @@ export default function UserAnalytics() {
                 height={chartData.length > 15 ? 80 : 40}
                 interval={Math.max(0, Math.floor(chartData.length / 7))}
               />
-              <YAxis tick={{ fontSize: 12, fill: '#cbd5e1' }} allowDecimals={false} />
+              <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#cbd5e1' }} allowDecimals={false} />
+              {redditPosts.length > 0 && (
+                <YAxis yAxisId="right" orientation="right" tick={false} />
+              )}
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #fbbf24',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
-                }}
-                labelStyle={{ color: '#fbbf24' }}
-                formatter={(value) => [`${value} users`, 'New Users']}
-                labelFormatter={(label) => `${label}`}
+                content={<CustomTooltip redditPosts={redditPosts} viewMode={viewMode} />}
               />
+              {redditPosts.length > 0 && <Legend />}
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="count"
                 stroke="#fbbf24"
@@ -728,8 +839,22 @@ export default function UserAnalytics() {
                 strokeWidth={2}
                 isAnimationActive={true}
                 name="New Users"
-                label={{ position: 'top', fill: '#fbbf24', fontSize: 12, offset: 10 }}
+                label={{ position: 'top', fill: '#fbbf24', fontSize: 12, offset: 10, fontWeight: 'bold' }}
               />
+              {redditPosts.length > 0 && (
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="redditViews"
+                  stroke="#8b5cf6"
+                  strokeOpacity={0.5}
+                  dot={{ fill: '#8b5cf6', r: 4, fillOpacity: 0.5 }}
+                  activeDot={{ r: 6 }}
+                  strokeWidth={2}
+                  isAnimationActive={true}
+                  name={selectedCountry ? REDDIT_COMMUNITIES[selectedCountry.name] || 'Reddit Upvotes' : 'Reddit Upvotes'}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         ) : (
