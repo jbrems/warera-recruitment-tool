@@ -453,9 +453,24 @@ export default function UserAnalytics() {
 
     while (data.length > 0) {
       const lastEntry = data[data.length - 1]
-      // Parse the date string (yyyy-MM-dd format)
-      const [year, month, day] = lastEntry.date.split('-').map(Number)
-      const entryDate = new Date(year, month - 1, day, 23, 59, 59)
+      let entryDate
+
+      // Parse the date string based on format
+      if (viewMode === 'hourly') {
+        // Format: yyyy-MM-dd HH:00
+        const [datePart, timePart] = lastEntry.date.split(' ')
+        const [year, month, day] = datePart.split('-').map(Number)
+        const hour = parseInt(timePart.split(':')[0])
+        entryDate = new Date(year, month - 1, day, hour, 0, 0)
+      } else if (viewMode === 'monthly') {
+        // Format: yyyy-MM
+        const [year, month] = lastEntry.date.split('-').map(Number)
+        entryDate = new Date(year, month - 1, 1, 23, 59, 59)
+      } else {
+        // Format: yyyy-MM-dd (daily)
+        const [year, month, day] = lastEntry.date.split('-').map(Number)
+        entryDate = new Date(year, month - 1, day, 23, 59, 59)
+      }
 
       if (lastEntry.count === 0 && entryDate > now) {
         data.pop()
