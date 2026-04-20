@@ -11,6 +11,7 @@ export const REDDIT_COMMUNITIES = {
   'Italy': 'r/WarEraITA',
   'Netherlands': 'r/WarEraNL',
   'Serbia': 'r/WarEraSerbia',
+  'South Africa': 'r/SouthafricaWarEra',
   'Spain': 'r/WarEraES',
   'Sweden': 'r/WarEraSWE',
   'Switzerland': 'r/WarEraCH',
