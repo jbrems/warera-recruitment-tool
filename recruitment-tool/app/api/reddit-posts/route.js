@@ -18,7 +18,7 @@ export async function GET(request) {
 
       const response = await fetch(url.toString(), {
         headers: {
-          'User-Agent': 'WarereaBelgium Analytics (warera-recruitment-tool, v1.0)'
+          'User-Agent': 'vercel:Warera recruitment tool:v1.0.0 (by /u/jbrms)'
         }
       })
 
