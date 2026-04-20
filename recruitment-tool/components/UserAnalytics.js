@@ -449,13 +449,13 @@ export default function UserAnalytics() {
     // Remove trailing zeros (future dates with no users)
     const now = new Date()
     now.setHours(23, 59, 59, 999)
-    
+
     while (data.length > 0) {
       const lastEntry = data[data.length - 1]
       // Parse the date string (yyyy-MM-dd format)
       const [year, month, day] = lastEntry.date.split('-').map(Number)
       const entryDate = new Date(year, month - 1, day, 23, 59, 59)
-      
+
       if (lastEntry.count === 0 && entryDate > now) {
         data.pop()
       } else {
@@ -593,7 +593,7 @@ export default function UserAnalytics() {
   }
 
   return (
-    <div className="w-full h-full overflow-auto flex flex-col bg-slate-900 p-2 md:p-6" style={{ scrollbarGutter: 'stable' }}>
+    <div className="w-full h-full overflow-auto flex flex-col bg-slate-900 px-1 py-2 md:p-6" style={{ scrollbarGutter: 'stable' }}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-yellow-400 mb-4">
@@ -812,7 +812,7 @@ export default function UserAnalytics() {
           </div>
         ) : chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 20, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#64748b" />
               <XAxis
                 dataKey="displayDate"
@@ -828,20 +828,7 @@ export default function UserAnalytics() {
               <Tooltip
                 content={<CustomTooltip redditPosts={redditPosts} viewMode={viewMode} />}
               />
-              {redditPosts.length > 0 && (
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="redditViews"
-                  stroke="#8b5cf6"
-                  strokeOpacity={0.5}
-                  dot={{ fill: '#8b5cf6', r: 4, fillOpacity: 0.5 }}
-                  activeDot={{ r: 6 }}
-                  strokeWidth={2}
-                  isAnimationActive={true}
-                  name="Reddit Upvotes"
-                />
-              )}
+              {redditPosts.length > 0 && <Legend />}
               <Line
                 yAxisId="left"
                 type="monotone"
@@ -854,6 +841,20 @@ export default function UserAnalytics() {
                 name="New Users"
                 label={{ position: 'top', fill: '#fbbf24', fontSize: 12, offset: 10, fontWeight: 'bold' }}
               />
+              {redditPosts.length > 0 && (
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="redditViews"
+                  stroke="#8b5cf6"
+                  strokeOpacity={0.5}
+                  dot={{ fill: '#8b5cf6', r: 4, fillOpacity: 0.5 }}
+                  activeDot={{ r: 6 }}
+                  strokeWidth={2}
+                  isAnimationActive={true}
+                  name={selectedCountry ? REDDIT_COMMUNITIES[selectedCountry.name] || 'Reddit Upvotes' : 'Reddit Upvotes'}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         ) : (
