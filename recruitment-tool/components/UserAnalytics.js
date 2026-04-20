@@ -88,6 +88,7 @@ export default function UserAnalytics() {
   const [countryInputValue, setCountryInputValue] = useState('')
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false)
   const [highlightedCountryIndex, setHighlightedCountryIndex] = useState(-1)
+  const [loadingRedditPosts, setLoadingRedditPosts] = useState(false)
   const countryComboboxRef = useRef(null)
   const countryDropdownRef = useRef(null)
   const highlightedItemRef = useRef(null)
@@ -230,6 +231,7 @@ export default function UserAnalytics() {
   useEffect(() => {
     if (!selectedCountry) {
       setRedditPosts([])
+      setLoadingRedditPosts(false)
       return
     }
 
@@ -237,11 +239,13 @@ export default function UserAnalytics() {
     if (!subreddit) {
       console.log(`[Client] No Reddit community configured for ${selectedCountry.name}`)
       setRedditPosts([])
+      setLoadingRedditPosts(false)
       return
     }
 
     const loadRedditPosts = async () => {
       try {
+        setLoadingRedditPosts(true)
         console.log(`[Client] Fetching Reddit posts from ${subreddit}...`)
         const posts = await fetchRedditPosts(subreddit.replace('r/', ''), 100)
         console.log(`[Client] Successfully loaded ${posts.length} Reddit posts from ${subreddit}`)
@@ -249,6 +253,8 @@ export default function UserAnalytics() {
       } catch (err) {
         console.error(`[Client] Error fetching Reddit posts from ${subreddit}:`, err)
         setRedditPosts([])
+      } finally {
+        setLoadingRedditPosts(false)
       }
     }
     loadRedditPosts()
@@ -820,11 +826,11 @@ export default function UserAnalytics() {
 
       {/* Chart */}
       <div className="bg-slate-800 rounded-lg shadow-md px-1 py-4 md:px-4 flex-1 min-h-0 border border-slate-700">
-        {loading ? (
+        {loading || loadingRedditPosts ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-              <p className="text-slate-300 text-lg font-medium">Loading graph...</p>
+              <p className="text-slate-300 text-lg font-medium">{loading ? 'Loading user data...' : 'Loading Reddit data...'}</p>
             </div>
           </div>
         ) : chartData.length > 0 ? (
