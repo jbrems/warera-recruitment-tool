@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { fetchCountries } from '@/lib/warera-api'
 import { groupUsersByDay, groupUsersByHour, groupUsersByMonth, getCurrentMonth, getPreviousMonth, getNextMonth, getCurrentDay, getPreviousDay, getNextDay, getCurrentYear, getPreviousYear, getNextYear } from '@/lib/data-processing'
 import { fetchRedditPosts, groupRedditPostsByDay, groupRedditPostsByHour, groupRedditPostsByMonth } from '@/lib/reddit-utils'
+import { REDDIT_COMMUNITIES } from '@/lib/reddit-communities'
 
 function CustomTooltip({ active, payload, redditPosts, viewMode }) {
   if (!active || !payload || payload.length === 0) return null
@@ -223,23 +224,33 @@ export default function UserAnalytics() {
     loadCountries()
   }, [])
 
-  // Fetch Reddit posts on mount
+  // Fetch Reddit posts when country changes (only if country has a Reddit community)
   useEffect(() => {
+    if (!selectedCountry) {
+      setRedditPosts([])
+      return
+    }
+
+    const subreddit = REDDIT_COMMUNITIES[selectedCountry.name]
+    if (!subreddit) {
+      console.log(`[Client] No Reddit community configured for ${selectedCountry.name}`)
+      setRedditPosts([])
+      return
+    }
+
     const loadRedditPosts = async () => {
       try {
-        console.log('[Client] Fetching Reddit posts from r/WareraBelgium...')
-        const posts = await fetchRedditPosts('WareraBelgium', 100)
-        console.log(`[Client] Successfully loaded ${posts.length} Reddit posts`)
+        console.log(`[Client] Fetching Reddit posts from ${subreddit}...`)
+        const posts = await fetchRedditPosts(subreddit.replace('r/', ''), 100)
+        console.log(`[Client] Successfully loaded ${posts.length} Reddit posts from ${subreddit}`)
         setRedditPosts(posts)
       } catch (err) {
-        console.error('[Client] Error fetching Reddit posts:', err)
-        // Don't set error state - Reddit data is optional
-        // Continue with just user data
+        console.error(`[Client] Error fetching Reddit posts from ${subreddit}:`, err)
         setRedditPosts([])
       }
     }
     loadRedditPosts()
-  }, [])
+  }, [selectedCountry])
 
   // Handle country selection from combobox
   const handleCountrySelect = (country) => {

@@ -1,19 +1,20 @@
-export const REDDIT_COMMUNITIES = [
-  { country: 'Argentina', community: 'r/WarEraArgentina' },
-  { country: 'Australie', community: 'r/WarEraAUS' },
-  { country: 'Austria', community: 'r/WarEraAustria' },
-  { country: 'Belgium', community: 'r/WareraBelgium' },
-  { country: 'Croatia', community: 'r/WarEraCRO' },
-  { country: 'Germany', community: 'r/WarEraDE' },
-  { country: 'Hungary', community: 'r/Warera_HUN' },
-  { country: 'India', community: 'r/IndiaWarEra' },
-  { country: 'Italy', community: 'r/WarEraITA' },
-  { country: 'Netherlands', community: 'r/WarEraNL' },
-  { country: 'Serbia', community: 'r/WarEraSerbia' },
-  { country: 'Spain', community: 'r/WarEraES' },
-  { country: 'Sweden', community: 'r/WarEraSWE' },
-  { country: 'Switzerland', community: 'r/WarEraCH' },
-  { country: 'Turkey', community: 'r/WarEraTurkiye' },
-  { country: 'UK', community: 'r/WarEraUK' },
-  { country: 'USA', community: 'r/WarEra_USA' }
-]
+// Map of country names (as returned from API) to their Reddit communities
+export const REDDIT_COMMUNITIES = {
+  'Argentina': 'r/WarEraArgentina',
+  'Australia': 'r/WarEraAUS',
+  'Austria': 'r/WarEraAustria',
+  'Belgium': 'r/WareraBelgium',
+  'Croatia': 'r/WarEraCRO',
+  'Germany': 'r/WarEraDE',
+  'Hungary': 'r/Warera_HUN',
+  'India': 'r/IndiaWarEra',
+  'Italy': 'r/WarEraITA',
+  'Netherlands': 'r/WarEraNL',
+  'Serbia': 'r/WarEraSerbia',
+  'Spain': 'r/WarEraES',
+  'Sweden': 'r/WarEraSWE',
+  'Switzerland': 'r/WarEraCH',
+  'Turkiye': 'r/WarEraTurkiye',
+  'United Kingdom': 'r/WarEraUK',
+  'United States': 'r/WarEra_USA'
+}
